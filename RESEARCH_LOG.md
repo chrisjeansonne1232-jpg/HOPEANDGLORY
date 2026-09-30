@@ -177,3 +177,9 @@ and fees peak at mid prices (1.75c/contract at 50c) vs edges of a few cents. Dat
 - Rule: trade if edge = p - (price + fee/contract) >= theta, theta in {0.03, 0.05, 0.08}; fixed 1% of bankroll per trade capped by 10% of prior-hour volume; max trades/day capped.
 - Also: favourite-longshot calibration by price bucket at DT (no model), rules "sell longshots" (buy NO when yes_ask<=0.10 / 0.05).
 - Every (DT x theta x city-set) is a trial; 2x cost (slippage 2c, fee x2) and +-20% theta nudges logged. Holdout touched once per finalist.
+
+**Addendum (2026-09-30, before any weather analysis): city bias.** Miami's Kalshi markets start 2023-05, Austin/others may too, so per-city bias cannot always be fitted on dev.
+Replaced by a strictly point-in-time rolling bias: for event D and decision time DT, bias = mean(actual - txn) over the previous 60 events of that city that had SETTLED
+before DT (DT1: events <= D-2; DT2: events <= D-1), requiring >= 20; events lacking that history are excluded from ALL evaluation (burn-in). The global sigma parameters
+(a, c) are still fitted on dev events only. Station mapping (e.g. Chicago KMDW vs KORD) is decided from forecast-vs-settlement error size on dev events, never from P&L.
+Data note: archived Kalshi candles use field names `close`/`volume` (live: `close_dollars`/`volume_fp`); loader fixed and verified on 2021, 2023, 2025 and 2026 markets.

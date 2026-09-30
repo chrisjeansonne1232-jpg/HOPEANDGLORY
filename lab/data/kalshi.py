@@ -18,7 +18,7 @@ OUT = DATA_RAW / "kalshi"
 _lock, _last = threading.Lock(), [0.0]
 
 
-def _get(path: str, params: dict, retries: int = 6, min_interval: float = 0.15):
+def _get(path: str, params: dict, retries: int = 6, min_interval: float = 0.07):
     for i in range(retries):
         with _lock:                                   # global pacing (~12 req/s max across threads)
             wait = _last[0] + min_interval - time.time()
@@ -86,10 +86,15 @@ def _candles_one(series: str, ticker: str, o: int, c: int, period: int = 60) -> 
     d = _get(path, {"start_ts": o, "end_ts": c, "period_interval": period})
     out = []
     for k in (d or {}).get("candlesticks", []):
-        f = lambda blk, fld: float(k[blk][fld]) if k.get(blk) and k[blk].get(fld) not in (None, "") else None
-        out.append({"ticker": ticker, "end_ts": k["end_period_ts"], "bid_close": f("yes_bid", "close_dollars"), "ask_close": f("yes_ask", "close_dollars"),
-                    "bid_open": f("yes_bid", "open_dollars"), "ask_open": f("yes_ask", "open_dollars"),
-                    "price_close": f("price", "close_dollars"), "volume": float(k.get("volume_fp") or 0), "oi": float(k.get("open_interest_fp") or 0)})
+        def f(blk, fld):                                   # live format: "close_dollars"; archived format: "close"
+            b = k.get(blk) or {}
+            v = b.get(f"{fld}_dollars", b.get(fld))
+            return float(v) if v not in (None, "") else None
+        vol = k.get("volume_fp", k.get("volume"))
+        oi = k.get("open_interest_fp", k.get("open_interest"))
+        out.append({"ticker": ticker, "end_ts": k["end_period_ts"], "bid_close": f("yes_bid", "close"), "ask_close": f("yes_ask", "close"),
+                    "bid_open": f("yes_bid", "open"), "ask_open": f("yes_ask", "open"), "price_close": f("price", "close"),
+                    "volume": float(vol or 0), "oi": float(oi or 0)})
     return out
 
 

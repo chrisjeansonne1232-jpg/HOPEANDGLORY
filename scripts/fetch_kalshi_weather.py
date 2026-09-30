@@ -5,4 +5,4 @@ from lab.data import kalshi, iem
 
 SERIES = sys.argv[1].split(",") if len(sys.argv) > 1 else ["KXHIGHCHI", "KXHIGHMIA", "KXHIGHAUS", "KXHIGHLAX", "KXHIGHDEN", "KXHIGHPHIL"]
 for s in SERIES:
-    kalshi.fetch_series(s, workers=6)
+    kalshi.fetch_series(s, workers=8, min_volume=20)

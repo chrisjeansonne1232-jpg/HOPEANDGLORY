@@ -69,8 +69,8 @@ def outcome_prob(row_type, floor, cap, mu, sigma):
     return norm.cdf((cap + 0.5 - mu) / sigma) - norm.cdf((floor - 0.5 - mu) / sigma)
 
 
-def p_yes(df: pd.DataFrame, bias: dict, a: float, c: float) -> np.ndarray:
-    mu = df.txn.to_numpy() + df.series.map(bias).to_numpy()
+def p_yes(df: pd.DataFrame, a: float, c: float) -> np.ndarray:
+    mu = df.txn.to_numpy() + df.bias.to_numpy()
     sig = np.sqrt(a**2 + (c * df.xnd.fillna(2.0).to_numpy()) ** 2)
     st, fl, cp = df.strike_type.to_numpy(), df.floor_strike.to_numpy(), df.cap_strike.to_numpy()
     out = np.empty(len(df))
@@ -81,12 +81,23 @@ def p_yes(df: pd.DataFrame, bias: dict, a: float, c: float) -> np.ndarray:
     return np.clip(out, 1e-4, 1 - 1e-4)
 
 
-def fit_model(df: pd.DataFrame, dt_name: str, splits=PREDICTION_SPLITS) -> dict:
-    """Fit per-city bias and a global sigma = sqrt(a^2 + (c*xnd)^2) on DEVELOPMENT events only (one row per event)."""
-    ev = df[(df.dt_name == dt_name) & (df.D <= pd.Timestamp(splits.dev_end))].drop_duplicates(["series", "D"]).dropna(subset=["txn"])
-    res = ev.expiration_value - ev.txn
-    bias = res.groupby(ev.series).mean().to_dict()
-    e = (res - ev.series.map(bias)).to_numpy()
+def add_rolling_bias(df: pd.DataFrame, window: int = 60, min_hist: int = 20) -> pd.DataFrame:
+    """Point-in-time city bias: mean residual (actual - txn) of the previous `window` settled events, per series and decision time.
+    DT1 (evening before) cannot yet know event D-1's result; DT2 (morning of D) knows D-1's."""
+    out = []
+    for (ser, name), g in df.groupby(["series", "dt_name"]):
+        ev = g.drop_duplicates("D").sort_values("D").copy()
+        ev["res"] = ev.expiration_value - ev.txn
+        lag = 2 if name == "DT1" else 1
+        ev["bias"] = ev.res.shift(lag).rolling(window, min_periods=min_hist).mean()
+        out.append(g.merge(ev[["D", "bias"]], on="D", how="left"))
+    return pd.concat(out, ignore_index=True)
+
+
+def fit_sigma(df: pd.DataFrame, dt_name: str, splits=PREDICTION_SPLITS) -> dict:
+    """Fit sigma = sqrt(a^2 + (c*xnd)^2) on DEVELOPMENT events only (one row per event), residuals net of the rolling bias."""
+    ev = df[(df.dt_name == dt_name) & (df.D <= pd.Timestamp(splits.dev_end))].drop_duplicates(["series", "D"]).dropna(subset=["txn", "bias"])
+    e = (ev.expiration_value - ev.txn - ev.bias).to_numpy()
     xnd = ev.xnd.fillna(2.0).to_numpy()
 
     def nll(p):
@@ -96,7 +107,7 @@ def fit_model(df: pd.DataFrame, dt_name: str, splits=PREDICTION_SPLITS) -> dict:
         return -np.log(np.clip(pr, 1e-12, None)).sum()
 
     r = minimize(nll, x0=[1.5, 0.5], method="Nelder-Mead")
-    return {"bias": bias, "a": abs(r.x[0]) + 1e-3, "c": abs(r.x[1]), "n_dev_events": len(ev), "mae_dev": float(np.abs(e).mean()), "sd_dev": float(e.std())}
+    return {"a": abs(r.x[0]) + 1e-3, "c": abs(r.x[1]), "n_dev_events": len(ev), "mae_dev": float(np.abs(e).mean()), "sd_dev": float(e.std())}
 
 
 def forecast_error_report(df: pd.DataFrame) -> pd.DataFrame:

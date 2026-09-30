@@ -1,0 +1,22 @@
+{
+ "checked_utc": "2026-09-30T05:19:19+00:00",
+ "hosts": {
+  "stooq (daily equities/ETFs)": "BLOCKED by network policy (proxy refused CONNECT)",
+  "yahoo chart (daily, adj close)": "BLOCKED by network policy (proxy refused CONNECT)",
+  "fred (macro, rates)": "BLOCKED by network policy (proxy refused CONNECT)",
+  "coinbase candles": "BLOCKED by network policy (proxy refused CONNECT)",
+  "binance.us klines": "BLOCKED by network policy (proxy refused CONNECT)",
+  "binance public bulk data": "BLOCKED by network policy (proxy refused CONNECT)",
+  "kalshi api": "BLOCKED by network policy (proxy refused CONNECT)",
+  "polymarket gamma": "BLOCKED by network policy (proxy refused CONNECT)",
+  "polymarket clob": "BLOCKED by network policy (proxy refused CONNECT)",
+  "noaa weather.gov": "BLOCKED by network policy (proxy refused CONNECT)",
+  "noaa ncei (GHCN history)": "BLOCKED by network policy (proxy refused CONNECT)",
+  "iowa mesonet (forecast/MOS archive)": "BLOCKED by network policy (proxy refused CONNECT)",
+  "sec edgar": "BLOCKED by network policy (proxy refused CONNECT)",
+  "cboe (VIX futures history)": "BLOCKED by network policy (proxy refused CONNECT)",
+  "massive/polygon api": "BLOCKED by network policy (proxy refused CONNECT)",
+  "ntfy.sh (final heads-up)": "BLOCKED by network policy (proxy refused CONNECT)",
+  "pypi (packages)": "reachable (HTTP 200)"
+ }
+}

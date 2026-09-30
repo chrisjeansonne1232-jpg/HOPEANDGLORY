@@ -1,0 +1,8 @@
+pandas>=2.2
+numpy>=1.26
+scipy>=1.11
+matplotlib>=3.8
+pyarrow>=15
+requests>=2.31
+pytest>=8
+arch>=7   # only for the bundled real S&P 500 / Ken French demo data

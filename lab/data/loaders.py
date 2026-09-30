@@ -83,7 +83,7 @@ def fetch_fred(series: str, use_cache: bool = True) -> pd.Series:
     if use_cache and (c := cache.load("fred", series)) is not None:
         return c[series]
     url = "https://fred.stlouisfed.org/graph/fredgraph.csv"
-    s = parse_fred_csv(get(url, params={"id": series}), series)
+    s = parse_fred_csv(get(url, params={"id": series}, timeout=120, retries=4), series)
     cache.save(s.to_frame(), "fred", series, url=f"{url}?id={series}")
     return s
 

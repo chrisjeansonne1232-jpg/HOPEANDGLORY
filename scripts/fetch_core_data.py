@@ -16,13 +16,15 @@ def run(label, fn):
     try:
         return fn()
     except NetworkBlocked as e:
-        failures.append((label, "BLOCKED")); print(f"  !! {label}: BLOCKED ({e})"); raise SystemExit(2)
+        failures.append((label, "UNREACHABLE")); print(f"  !! {label}: unreachable ({e})")
+        if not label.startswith("stooq"):    # stooq resets connections (2026-09-30); Yahoo is the primary source
+            raise SystemExit(2)
     except Exception as e:
         failures.append((label, repr(e))); print(f"  !! {label}: {e!r}")
 
 for s in ETFS:
     y = run(f"yahoo {s}", lambda: L.fetch_yahoo(s))
-    z = run(f"stooq {s}", lambda: L.fetch_stooq(f"{s.lower()}.us"))
+    z = None  # Stooq now serves a bot-check page / resets connections (2026-09-30); no second source for equities here
     if y is not None:
         for i in Q.check_ohlcv(y, s): print(f"  {s} yahoo {i}")
     if y is not None and z is not None:

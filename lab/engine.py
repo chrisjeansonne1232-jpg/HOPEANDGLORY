@@ -212,3 +212,51 @@ def buy_and_hold(panel: Panel, asset: str, cost: CostModel = DEFAULT.cost, rf_pe
                  splits: SplitConfig = EQUITY_SPLITS, exec_mode: str = "next_open") -> BacktestResult:
     w = pd.DataFrame(1.0, index=panel.index, columns=[asset])
     return run_backtest(panel, w, cost=cost, rf_period=rf_period, exec_mode=exec_mode, label=label or f"buy&hold {asset}", splits=splits)
+
+
+def run_session_only(panel: Panel, weights: pd.DataFrame, session: str, cost: CostModel = DEFAULT.cost,
+                     rf_period: pd.Series | None = None, label: str = "", allow_short: bool = False,
+                     splits: SplitConfig = EQUITY_SPLITS) -> BacktestResult:
+    """Hold only part of each day and pay BOTH legs' costs every time.
+    session="overnight": buy at close t, sell at open t+1  (weights[t] is a same-close decision: an approximation of a MOC order)
+    session="intraday" : buy at open t+1, sell at close t+1 (weights[t] decided at close t, executed next open, exit same close)
+    Cash earns rf minus haircut for the periods not held. The whole position is closed each day (no drift)."""
+    if session not in ("overnight", "intraday"):
+        raise ValueError("session must be 'overnight' or 'intraday'")
+    guard_panel(panel, splits)
+    idx, assets = panel.index, list(weights.columns)
+    c, o = panel.adj_close[assets], panel.adj_open[assets]
+    w = weights.reindex(idx).fillna(0.0).where(c.notna(), 0.0)
+    _check_weights(w, 1.0, allow_short)
+    ov = (o / c.shift(1) - 1.0).fillna(0.0)          # ov[t]: close t-1 -> open t
+    intr = (c / o - 1.0).fillna(0.0)
+    if session == "overnight":
+        pos = w.shift(1).fillna(0.0)                 # pos[t] held from close t-1 to open t
+        gross_a = pos * ov
+    else:
+        pos = w.shift(1).fillna(0.0)                 # pos[t] held from open t to close t
+        gross_a = pos * intr
+    k = cost.cost_multiplier
+    unit = pd.Series({a: cost.half_spread_for(a) + cost.slippage_bps + cost.fee_bps for a in assets}) * k
+    trading_a = pos.abs().mul(2.0 * unit / 1e4, axis=1)                        # in AND out, every day
+    px_raw = panel.close[assets].replace(0.0, np.nan)
+    reg_a = pos.abs() * ((cost.sec_fee_per_million_usd / 1e6) + (cost.taf_per_share_usd / px_raw).fillna(0.0)) * k
+    held_frac = pos.clip(lower=0.0).sum(axis=1)
+    rf = rf_period.reindex(idx).fillna(0.0) if rf_period is not None else pd.Series(0.0, index=idx)
+    dt_days = pd.Series(idx, index=idx).diff().dt.days.fillna(1).clip(lower=1)
+    cash_ret = (1.0 - held_frac).clip(lower=0.0) * (rf - cost.cash_haircut_annual * dt_days / 365.0)
+    costs = pd.DataFrame({"trading": trading_a.sum(axis=1), "regulatory": reg_a.sum(axis=1), "commission": 0.0, "borrow": 0.0, "financing": 0.0})
+    gross = gross_a.sum(axis=1) + cash_ret
+    net = gross - costs.sum(axis=1)
+    rows = []
+    for a in assets:
+        m = pos[a].abs() > EPS
+        for t in idx[m]:
+            pnl = float(gross_a.loc[t, a] - trading_a.loc[t, a] - reg_a.loc[t, a])
+            rows.append({"asset": a, "side": "long" if pos.loc[t, a] > 0 else "short", "entry": t, "exit": t, "periods": 1,
+                         "avg_alloc": float(abs(pos.loc[t, a])), "pnl_frac": pnl, "ret_on_alloc": pnl / float(abs(pos.loc[t, a])),
+                         "still_open": False})
+    trades = pd.DataFrame(rows, columns=["asset", "side", "entry", "exit", "periods", "avg_alloc", "pnl_frac", "ret_on_alloc", "still_open"])
+    return BacktestResult(label=label, exec_mode=f"session_{session}", returns=net.rename("net"), gross_returns=gross.rename("gross"),
+                          costs=costs, pos=pos, turnover=2.0 * pos.abs().sum(axis=1), trades=trades, rf=rf, ppy=panel.ppy,
+                          cost_model=cost, caveats=list(panel.caveats), data_source=panel.source)

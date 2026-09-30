@@ -25,7 +25,11 @@ def _get(path: str, params: dict, retries: int = 6, min_interval: float = 0.07):
             if wait > 0:
                 time.sleep(wait)
             _last[0] = time.time()
-        r = requests.get(BASE + path, params=params, timeout=60)
+        try:
+            r = requests.get(BASE + path, params=params, timeout=60)
+        except requests.exceptions.RequestException:          # dropped connection / SSL EOF / timeout: back off and retry
+            time.sleep(min(2 ** i, 30))
+            continue
         if r.status_code == 200:
             return r.json()
         if r.status_code in (429, 500, 502, 503, 504):

@@ -205,3 +205,27 @@ def inverse_vol_slots(assets, n, vol_lb=60, monthly=True):
         w = w.div(iv.sum(axis=1), axis=0).fillna(0.0)      # weights among ALL assets sum to 1; off-trend slots stay in cash
         return monthly_hold(w) if monthly else w
     return f
+
+
+def pairs_zscore(a, b, lookback, entry, exit_z=0.5):
+    """Dollar-neutral pair: z-score of log(P_a/P_b) vs its rolling mean/std. z > entry -> short a / long b; z < -entry -> long a / short b;
+    close when |z| < exit_z. Each leg carries 0.5 of equity (gross 1)."""
+    def f(panel):
+        la, lb = np.log(panel.adj_close[a]), np.log(panel.adj_close[b])
+        sp = la - lb
+        z = ((sp - sp.rolling(lookback).mean()) / sp.rolling(lookback).std()).to_numpy()
+        pos, out = 0.0, np.zeros(len(z))
+        for i in range(len(z)):
+            if not np.isfinite(z[i]):
+                out[i] = 0.0
+                continue
+            if pos == 0.0:
+                if z[i] > entry:
+                    pos = -1.0
+                elif z[i] < -entry:
+                    pos = 1.0
+            elif (pos < 0 and z[i] < exit_z) or (pos > 0 and z[i] > -exit_z):
+                pos = 0.0
+            out[i] = pos
+        return pd.DataFrame({a: 0.5 * out, b: -0.5 * out}, index=panel.index)
+    return f

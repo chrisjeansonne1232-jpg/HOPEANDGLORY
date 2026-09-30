@@ -26,6 +26,8 @@ R_CRYPTO = ("economic: retail/flow-driven trends in a market with high frictions
             "late retail momentum chasers. Retail fees ~0.6%/side => only low-turnover rules can survive.")
 R_VIXTS = ("economic: VIX term-structure backwardation marks stress/vol-clustering regimes in which the equity premium per unit of risk "
            "is poor and forced deleveraging is under way; counterparty = investors who stay fully exposed into stress.")
+R_PAIRS = ("economic: near-substitute ETFs share factor exposure, so their price ratio mean-reverts when one leg is pushed by transient "
+           "flow; counterparty = liquidity demanders. Weak post-2010 in the literature (crowded); shorting needs margin, borrow modelled at 1%/yr.")
 R_DM = "data-mining"
 
 
@@ -170,8 +172,21 @@ def f10_invvol_gtaa(verbose=True):
     return r
 
 
+def f11_pairs(verbose=True):
+    from lab.config import CostModel
+    from research.common import COST, SPREADS
+    cost = CostModel(half_spread_bps=2.0, half_spread_bps_by_asset=SPREADS, slippage_bps=1.0, borrow_bps_annual=100.0)
+    out = []
+    for a, b, st in (("GLD", "SLV", "2007-06-01"), ("EFA", "EEM", "2004-06-01"), ("XLP", "XLU", "2000-06-01"), ("LQD", "HYG", "2008-06-01"), ("IEF", "TLT", "2003-09-01")):
+        r = Runner([a, b], st, f"{a}/{b}", cost=cost, verbose=verbose)
+        for lb in (60, 120):
+            r.run("pairs_z", f"{a}_{b}_lb{lb}", {"a": a, "b": b, "lookback": lb, "entry": 2.0}, S.pairs_zscore(a, b, lb, 2.0), R_PAIRS, allow_short=True, max_gross=1.0)
+        out.append(r)
+    return out
+
+
 FAMILIES = {"f01a": f01_trend_spy, "f01b": f01_trend_related, "f02": f02_multiasset, "f03": f03_calendar, "f04": f04_reversal,
-            "f05": f05_volmanaged, "f06": f06_shortvol, "f07": f07_crypto, "f08": f08_vix_filter, "f09": f09_crypto_voltarget, "f10": f10_invvol_gtaa}
+            "f05": f05_volmanaged, "f06": f06_shortvol, "f07": f07_crypto, "f08": f08_vix_filter, "f09": f09_crypto_voltarget, "f10": f10_invvol_gtaa, "f11": f11_pairs}
 
 if __name__ == "__main__":
     import sys

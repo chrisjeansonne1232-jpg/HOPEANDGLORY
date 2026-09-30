@@ -172,3 +172,36 @@ def always_long(asset):
     def f(panel):
         return pd.DataFrame({asset: 1.0}, index=panel.index)
     return f
+
+
+def vix_contango_filter(asset, threshold):
+    """Hold `asset` only while VIX/VIX3M < threshold (term structure in contango = calm), else cash."""
+    def f(panel):
+        vix = cache.load("yahoo", "^VIX")["close"].reindex(panel.index).ffill()
+        v3 = cache.load("yahoo", "^VIX3M")["close"].reindex(panel.index).ffill()
+        ok = ((vix / v3) < threshold).fillna(False)
+        return pd.DataFrame({asset: ok.astype(float)}, index=panel.index)
+    return f
+
+
+def trend_voltarget_crypto(asset, n, target, lookback=30):
+    """Trend filter x inverse-vol sizing (weight = min(1, target / realised annualised vol))."""
+    def f(panel):
+        c = panel.adj_close[[asset]]
+        trend = (c > c.rolling(n).mean()).astype(float)
+        vol = c.pct_change().rolling(lookback).std() * np.sqrt(panel.ppy)
+        w = (target / vol).clip(upper=1.0).where(vol.notna(), 0.0)
+        return trend * w
+    return f
+
+
+def inverse_vol_slots(assets, n, vol_lb=60, monthly=True):
+    """Trend flags x inverse-vol weights, gross exposure capped at 1 (a risk-parity flavoured GTAA)."""
+    base = price_above_sma(assets, n)
+    def f(panel):
+        vol = panel.adj_close[assets].pct_change().rolling(vol_lb).std()
+        iv = (1.0 / vol).where(vol > 0)
+        w = base(panel) * iv
+        w = w.div(iv.sum(axis=1), axis=0).fillna(0.0)      # weights among ALL assets sum to 1; off-trend slots stay in cash
+        return monthly_hold(w) if monthly else w
+    return f

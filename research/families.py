@@ -24,6 +24,8 @@ R_SVOL = ("economic: variance risk premium - hedgers overpay for insurance (VIX 
           "hedgers. TAIL RISK: Feb-2018 one-day -83% in SVXY => weight capped so a repeat cannot lose >25%.")
 R_CRYPTO = ("economic: retail/flow-driven trends in a market with high frictions and few arbitrageurs; counterparty = "
             "late retail momentum chasers. Retail fees ~0.6%/side => only low-turnover rules can survive.")
+R_VIXTS = ("economic: VIX term-structure backwardation marks stress/vol-clustering regimes in which the equity premium per unit of risk "
+           "is poor and forced deleveraging is under way; counterparty = investors who stay fully exposed into stress.")
 R_DM = "data-mining"
 
 
@@ -142,8 +144,34 @@ def f07_crypto(verbose=True):
     return out
 
 
+def f08_vix_filter(verbose=True):
+    r = Runner(["SPY"], "2006-09-01", "SPY", verbose=verbose)
+    for th in (0.95, 1.00, 1.05):
+        r.run("vix_ts_filter", f"SPY_vixts_th{th}", {"threshold": th}, S.vix_contango_filter("SPY", th), R_VIXTS)
+    return r
+
+
+def f09_crypto_voltarget(verbose=True):
+    out = []
+    for sym, st in (("BTC-USD_86400", "2016-02-15"), ("ETH-USD_86400", "2017-01-01")):
+        r = Runner([sym], st, sym.split("_")[0], splits=CRYPTO_SPLITS, bench=sym, cost=CRYPTO_COST, ppy=365, src="coinbase", verbose=verbose)
+        for n, tgt in itertools.product((50, 150), (0.4, 0.6)):
+            r.run("crypto_trend_voltarget", f"{sym[:3]}_sma{n}_vt{int(tgt*100)}", {"n": n, "target": tgt}, S.trend_voltarget_crypto(sym, n, tgt),
+                  R_CRYPTO + " + sizing to cap drawdown (" + R_VOL[:40] + "...)")
+        out.append(r)
+    return out
+
+
+def f10_invvol_gtaa(verbose=True):
+    a5 = ["SPY", "EFA", "IEF", "GLD", "VNQ"]
+    r = Runner(a5, "2006-01-03", "GTAA5", verbose=verbose)
+    for n in (170, 210, 250):
+        r.run("gtaa_invvol", f"gtaa5iv_sma{n}", {"n": n, "assets": a5}, S.inverse_vol_slots(a5, n), R_TREND + " + inverse-vol risk weighting")
+    return r
+
+
 FAMILIES = {"f01a": f01_trend_spy, "f01b": f01_trend_related, "f02": f02_multiasset, "f03": f03_calendar, "f04": f04_reversal,
-            "f05": f05_volmanaged, "f06": f06_shortvol, "f07": f07_crypto}
+            "f05": f05_volmanaged, "f06": f06_shortvol, "f07": f07_crypto, "f08": f08_vix_filter, "f09": f09_crypto_voltarget, "f10": f10_invvol_gtaa}
 
 if __name__ == "__main__":
     import sys

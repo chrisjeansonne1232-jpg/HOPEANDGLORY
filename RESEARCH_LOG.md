@@ -201,3 +201,8 @@ Sharpe sampling variance 1/T of the candidate's own sample length; the plain var
 everything, so a crypto "pass" is estimator-dependent and must NOT be read as robust evidence. Any finalist must also be reported under the plain-before-junk estimator (hurdle ~1.0-1.2 annualised).
 Other reasons crypto trend is not a clean pass: full-size drawdowns of 36-82% (fails the 25% rule unless down-sized), two bull markets dominate the sample, BTC/ETH are survivors chosen ex post,
 few trades (22-68), holdout not yet looked at.
+
+## 12. Superseded `needs_data` rows (network opened later the same day)
+The `needs_data` rows in trials.csv dated before network access describe blocked hosts. Status now: `vix_term_structure_short_vol_etps` -> tested as `short_vol_ts` (SVXY via Yahoo; VIX futures history from CBOE is reachable but not needed);
+`kalshi_weather_vs_noaa_forecast` and `longshot_bias_kalshi_polymarket` -> being tested as `kalshi_weather_nbm` / `kalshi_weather_fav` (Kalshi + IEM APIs reachable); options (OPRA quotes), PEAD,
+single-stock momentum/reversal, funding-rate carry (offshore perps not US-legal) and latency arbitrage remain NOT testable with obtainable data. The ledger is append-only, so the old rows are left as history.

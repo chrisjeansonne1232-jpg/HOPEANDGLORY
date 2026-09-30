@@ -7,31 +7,28 @@ Tests: `python -m pytest -q` (38 pass). Network probe: `python scripts/check_net
 ---
 ## 0. STATUS / NEXT STEPS  (read this first)
 
-**Last updated:** 2026-09-30 (session 1, continuing). **Phase 1 complete. Phase 2 IN PROGRESS.** The user opened network access mid-session (Yahoo, FRED(flaky), Coinbase,
+**Last updated:** 2026-09-30 (session 1, PAUSED by the user). **Phase 1 complete. Phase 2 PAUSED mid-way (see below).** The user opened network access mid-session (Yahoo, FRED(flaky), Coinbase,
 Binance, Kalshi, Polymarket, NOAA, IEM, CBOE, ntfy all reachable; Stooq resets connections -> dropped; SEC returns 403 without a contact User-Agent; Massive API needs a key,
 which is NOT needed). No trades, no order code, no broker tools. Holdout untouched (`holdout_ledger.csv` empty).
 
-### Where Phase 2 stands
-- **Batch 1 (equities/ETFs/crypto, 132 variants logged, `python -m research.families`, results in trials.csv, ranking via `python scripts/leaderboard.py`)**:
-  families f01 SPY trend + related assets, f02 multi-asset trend / sector & asset-class momentum, f03 calendar (turn-of-month, day-of-week, overnight/intraday),
-  f04 reversal (RSI2, IBS), f05 vol-managed, f06 short-vol (SVXY, capped), f07 crypto trend/weekend, f08 VIX-contango filter, f09 crypto trend x vol-target, f10 inverse-vol multi-asset trend.
-  **0 of 132 reach DSR >= 0.95.** Deflation hurdle at N=132 is an annualised Sharpe of ~1.0. Best DSRs: crypto trend (0.84, but max DD 53-82% at full size), then
-  inverse-vol multi-asset trend (Sharpe 0.81 vs SPY 0.51, max DD -9%, but CAGR ~7.5% < SPY) and the VIX-contango filter on SPY (Sharpe 0.6-0.67 vs 0.51).
-- **Killed by costs / no edge:** overnight & intraday SPY/QQQ (daily round trip ~4bp x 252 = ~10%/yr), day-of-week, BTC weekend/weekday, IBS/RSI2 fade in validation (edge decayed: dev 0.8 -> val 0.3).
-- **Batch 2 (in progress): Kalshi weather markets vs NBM forecasts** (design pre-registered in section 9). Data: `python scripts/fetch_kalshi_weather.py` (candles) +
-  `python scripts/fetch_iem_weather.py` (forecasts); analysis module `research/weather.py`. NOT yet analysed: no price-vs-outcome result has been viewed.
-- Generic Phase-3 evaluator: `research/phase3.py` (use only for candidates that clear DSR or as near-miss reporting; never loads the holdout).
+### PAUSED by the user (2026-09-30). Exact state:
+- **Batch 1 done** (equities/ETFs/crypto, 145 tested variants incl. pairs f11 and BTC time-of-day; ranking: `python scripts/leaderboard.py`; per-family table: `python scripts/family_table.py`).
+  Under the plain-variance hurdle 0 of 145 reach DSR >= 0.95. Under the conservative-of-two hurdle (section 11) only BTC trend x vol-target variants approach/cross it (best 0.954) - estimator-dependent,
+  full-size max DD 36-82% (fails the 25% rule unless down-sized), few trades, bull-market-dominated, holdout unopened. Equity/ETF strategies: best DSR 0.70 (inverse-vol multi-asset trend,
+  Sharpe 0.81 vs SPY 0.51, max DD -9% but lower CAGR than SPY), then short-vol (0.62), VIX-contango filter on SPY (0.47).
+- **Batch 2 (Kalshi weather vs NBM) - data collection unfinished, NO weather P&L has been computed or viewed.** On disk (git-ignored `data/raw`): NYC candles complete; Chicago candles ~20% done (resumable);
+  IEM NBM/GFS forecasts complete for KNYC, KMDW, KORD, KMIA, KAUS, KLAX, KDEN, KPHL. Research universe = NYC, Chicago(KMDW), Miami, Austin (LAX/DEN/PHIL are holdout-era only).
+  Pipeline fixes and design are in section 9 + addenda. `research/weather_run.py` (grid) and `research/weather_diag.py` are written but NOT run.
+- **Resume, in order:**
+  1. `python scripts/fetch_kalshi_weather.py KXHIGHCHI,KXHIGHMIA,KXHIGHAUS` (checkpointed every 500 markets; ~10 min per city; needs network access to api.elections.kalshi.com).
+  2. `python -m research.weather_diag KXHIGHNY,KXHIGHCHI,KXHIGHMIA,KXHIGHAUS` (coverage, forecast error, calibration, model-vs-market Brier).
+  3. `python -m research.weather_run KXHIGHNY,KXHIGHCHI,KXHIGHMIA,KXHIGHAUS` (10 pre-registered trials, each also at 2x costs) then `python scripts/leaderboard.py`.
+  4. In a fresh container `data/raw` is gone: first re-run `python scripts/fetch_core_data.py`, `python scripts/fetch_iem_weather.py KNYC,KMDW,KMIA,KAUS`, and re-fetch hourly BTC with `lab.data.loaders.fetch_coinbase("BTC-USD", 3600, start="2016-01-01")`.
+- **Then:** Phase 3 on any finalist via `research/phase3.py` (crypto battery already written: `python -m research.crypto_finalist`, NOT yet run - it will log ~9 more trials), holdout ONCE per finalist
+  via `lab.splits.open_holdout`, write STRATEGY_REPORT.md (top-3 near-misses if none passes; family table from `scripts/family_table.py`), send the ntfy heads-up (needs the user's topic), STOP.
 
 ### Blockers / asks for the user
-1. **ntfy topic** (`<MY_TOPIC>`) for the Phase-4 heads-up (ntfy.sh is reachable now).
-2. Confirm defaults in `lab/config.py` (account $5,000, tax 22%).
-3. Massive/Polygon: only needed if an options idea proves worth buying quotes for (plan currently entitles ~recent equity data only; do not upgrade yet).
-
-### Next steps
-1. When weather downloads finish (`data/raw/kalshi/*_candles.parquet` for KXHIGHNY, CHI, MIA, AUS, LAX, DEN, PHIL and `data/raw/iem/NBS_*.parquet`): verify Chicago station (KMDW vs KORD) by
-   forecast error only, run the pre-registered grid in `research/weather.py` (NOT yet written as a runner: build_city / add_rolling_bias / fit_sigma / p_yes / simulate exist), log every variant.
-2. Model-free favourite-longshot rules on the same data. 3. If any variant clears DSR >= 0.95 -> Phase 3 (`research/phase3.py`) + one holdout look. 4. Otherwise near-miss report.
-5. STRATEGY_REPORT.md, ntfy, STOP.
+1. **ntfy topic** (`<MY_TOPIC>`) for the Phase-4 heads-up (ntfy.sh is reachable). 2. Confirm defaults in `lab/config.py` (account $5,000, tax 22%). 3. Massive: not needed unless an options idea is worth buying quotes for.
 
 ---
 ## 1. Pre-registration (frozen 2026-09-30, BEFORE any research backtest)

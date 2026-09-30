@@ -41,6 +41,7 @@ def build_city(series: str, station: str | None = None, nbm_model: str = "NBS") 
     mk["D"] = mk.event_ticker.map(event_date)
     mk["y"] = (mk.result == "yes").astype(int)
     cd = cd.sort_values("end_ts")
+    cd["cumvol"] = cd.groupby("ticker").volume.cumsum()
     out = []
     for name, (off, hr) in DT_SPEC.items():
         e = mk.copy()
@@ -51,9 +52,16 @@ def build_city(series: str, station: str | None = None, nbm_model: str = "NBS") 
         e["avail"] = e.dt - pd.Timedelta(hours=AVAIL_LAG_H)
         e = e.sort_values("avail")
         e = pd.merge_asof(e, fc, left_on="avail", right_on="runtime", by="ftime", direction="backward", tolerance=pd.Timedelta(hours=12))
-        q = pd.merge_asof(e.sort_values("dt_ts")[["ticker", "dt_ts"]], cd[["ticker", "end_ts", "bid_close", "ask_close", "volume", "oi"]],
-                          left_on="dt_ts", right_on="end_ts", by="ticker", direction="backward", tolerance=7200)
-        e = e.merge(q.drop(columns="dt_ts"), on="ticker", how="left")
+        # Kalshi omits hourly candles with no activity, so the standing quote is the LAST candle before DT (<= 4h old); liquidity = volume in the prior 6h
+        q = pd.merge_asof(e.sort_values("dt_ts")[["ticker", "dt_ts"]], cd[["ticker", "end_ts", "bid_close", "ask_close", "cumvol"]],
+                          left_on="dt_ts", right_on="end_ts", by="ticker", direction="backward", tolerance=14400)
+        q6 = e.sort_values("dt_ts")[["ticker", "dt_ts"]].assign(dt6=lambda x: x.dt_ts - 6 * 3600)
+        q6 = pd.merge_asof(q6.sort_values("dt6"), cd[["ticker", "end_ts", "cumvol"]].rename(columns={"cumvol": "cumvol6", "end_ts": "end6"}),
+                           left_on="dt6", right_on="end6", by="ticker", direction="backward")
+        q = q.merge(q6[["ticker", "dt_ts", "cumvol6"]], on=["ticker", "dt_ts"], how="left")
+        q["volume"] = (q.cumvol - q.cumvol6.fillna(0.0)).where(q.cumvol.notna())
+        q["quote_age_h"] = (q.dt_ts - q.end_ts) / 3600.0
+        e = e.merge(q.drop(columns=["cumvol", "cumvol6"]), on=["ticker", "dt_ts"], how="left")
         out.append(e)
     df = pd.concat(out, ignore_index=True)
     df["series"], df["station"] = series, station
@@ -118,7 +126,7 @@ def forecast_error_report(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def simulate(df: pd.DataFrame, pyes: np.ndarray, theta: float, slip: float = SLIP, fee_mult: float = 1.0, bankroll: float = 5000.0,
-             frac: float = 0.01, topk: int = 8, vol_frac: float = 0.25, mode: str = "model", longshot: float | None = None) -> pd.DataFrame:
+             frac: float = 0.01, topk: int = 8, vol_frac: float = 0.10, mode: str = "model", longshot: float | None = None) -> pd.DataFrame:
     """Returns a trades DataFrame (one row per trade) with pnl in USD. Fills: YES at ask + slip; NO at (1 - bid) + slip."""
     d = df.copy()
     d["p"] = pyes

@@ -206,3 +206,7 @@ few trades (22-68), holdout not yet looked at.
 The `needs_data` rows in trials.csv dated before network access describe blocked hosts. Status now: `vix_term_structure_short_vol_etps` -> tested as `short_vol_ts` (SVXY via Yahoo; VIX futures history from CBOE is reachable but not needed);
 `kalshi_weather_vs_noaa_forecast` and `longshot_bias_kalshi_polymarket` -> being tested as `kalshi_weather_nbm` / `kalshi_weather_fav` (Kalshi + IEM APIs reachable); options (OPRA quotes), PEAD,
 single-stock momentum/reversal, funding-rate carry (offshore perps not US-legal) and latency arbitrage remain NOT testable with obtainable data. The ledger is append-only, so the old rows are left as history.
+
+**Pipeline fix (2026-09-30, found while checking NYC coverage, BEFORE any weather P&L or price-vs-outcome result was viewed):** Kalshi omits hourly candles with no activity,
+so requiring a candle within 2h of the decision time dropped most DT2 quotes (24% coverage) although the book was standing; and liquidity was judged on a single (often zero-volume) hour.
+Changed to: standing quote = last candle before DT no more than 4h old (age recorded); liquidity reference = contracts traded in the prior 6h, position capped at 10% of it (was 25% of the prior hour).

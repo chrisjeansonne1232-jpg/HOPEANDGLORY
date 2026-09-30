@@ -48,14 +48,14 @@ def _df(rows):
 
 def test_simulate_fills_at_ask_and_no_ask_with_slippage_and_kalshi_fees():
     # YES ask 0.40 bid 0.38; model says 0.70 -> buys YES at 0.41 (ask + 1c slip), wins -> pnl = n*(1-0.41) - fee
-    d = _df([{"ticker": "a", "ask_close": 0.40, "bid_close": 0.38, "volume": 1000.0, "y": 1}])
+    d = _df([{"ticker": "a", "ask_close": 0.40, "bid_close": 0.38, "volume": 100000.0, "y": 1}])
     tr = W.simulate(d, np.array([0.70]), theta=0.03, frac=0.01, bankroll=5000.0, topk=8)
     assert len(tr) == 1 and tr.side_yes.iloc[0] and tr.price.iloc[0] == pytest.approx(0.41)
     n = int(tr.n.iloc[0])
     assert n == int(np.floor(50 / 0.41))
     assert tr.pnl.iloc[0] == pytest.approx(n * 0.59 - kalshi_fee(n, 0.41))
     # model says 0.10 -> buys NO at 1 - bid + 1c = 0.63 ; outcome y=0 means NO wins
-    d2 = _df([{"ticker": "b", "ask_close": 0.40, "bid_close": 0.38, "volume": 1000.0, "y": 0}])
+    d2 = _df([{"ticker": "b", "ask_close": 0.40, "bid_close": 0.38, "volume": 100000.0, "y": 0}])
     tr2 = W.simulate(d2, np.array([0.10]), theta=0.03, frac=0.01, bankroll=5000.0, topk=8)
     assert not tr2.side_yes.iloc[0] and tr2.price.iloc[0] == pytest.approx(0.63) and tr2.win.iloc[0]
     # empty book (ask 1.0) and zero volume are never traded

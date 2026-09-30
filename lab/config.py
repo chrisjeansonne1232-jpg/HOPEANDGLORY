@@ -63,8 +63,10 @@ class SplitConfig:
 EQUITY_SPLITS = SplitConfig(dev_end="2013-12-31", val_end="2023-12-31", name="equity")
 # Crypto history is shorter (spot BTC-USD from ~2015): dev 2015-2019, validation 2020-2023.
 CRYPTO_SPLITS = SplitConfig(dev_end="2019-12-31", val_end="2023-12-31", name="crypto")
-# Prediction markets (Kalshi ~2021+, Polymarket ~2020+): dev = 2021-2022, validation = 2023; same holdout start.
-PREDICTION_SPLITS = SplitConfig(dev_end="2022-12-31", val_end="2023-12-31", name="prediction")
+# Prediction markets (Kalshi weather history starts 2021-08). REVISED 2026-09-30, before any prediction-market outcome was viewed
+# (original: dev<=2022-12-31, val<=2023-12-31, which left only ~2.4y for dev+val): dev <= 2023-03-31, val 2023-04..2024-09,
+# HOLDOUT 2024-10-01..latest (~2.0y).
+PREDICTION_SPLITS = SplitConfig(dev_end="2023-03-31", val_end="2024-09-30", name="prediction")
 SPLITS_BY_MARKET = {"equity": EQUITY_SPLITS, "crypto": CRYPTO_SPLITS, "prediction": PREDICTION_SPLITS}
 
 

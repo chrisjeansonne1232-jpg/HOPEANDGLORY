@@ -156,3 +156,24 @@ The logged variants: sma200 (+2x costs row), sma200 same_close, sma160, sma240 (
 
 ## 8. Session log
 - S1 (2026-09-30): brief received (message arrived truncated once, then in full); built and tested the lab; ran the Phase-1 demo; probed data access; wrote this log. Stopped at the Phase-1 checkpoint as the brief requests ("show me the lab working ... before scaling up") and because Phase 2 needs network access only the user can grant.
+
+---
+## 9. PRE-REGISTRATION: Kalshi weather markets vs NOAA/NBM forecasts (written 2026-09-30 BEFORE any Kalshi/IEM data was pulled)
+
+**Split revision (disclosed):** prediction-market splits changed from dev<=2022 / val 2023 / holdout 2024+ to dev <= 2023-03-31, val 2023-04-01..2024-09-30,
+HOLDOUT 2024-10-01..latest (~2.0y). Made before viewing any prediction-market outcome; equity/crypto splits unchanged.
+
+**Why this is promising:** retail-heavy markets, a public model forecast with a published uncertainty (NBM `txn`/`xnd`, GFS MOS `n_x`), settlement on the NWS
+CLI report, hourly bid/ask candles. Counterparty = bettors anchoring on headline temperatures / stale forecasts. **Why it may fail:** pros may already arbitrage it,
+and fees peak at mid prices (1.75c/contract at 50c) vs edges of a few cents. Data verified reachable: Kalshi `/historical/markets` + `/markets` + batch candlesticks
+(KXHIGHNY archive 2021-08-07..2026-07-30, plus live), IEM `cgi-bin/request/mos.py` bulk MOS (GFS `n_x`, NBS `txn`,`xnd`). API confirms `fee_type=quadratic`, multiplier 1.
+
+**Design (fixed now):**
+- Cities/series: highest-liquidity daily HIGH-temperature series (start: NYC KNYC, Chicago KMDW, Miami KMIA, Austin KAUS, LA KLAX, Denver KDEN, Philadelphia KPHL);
+  station mapping verified by checking forecast-vs-settlement error size before use.
+- Decision times (each a separate trial): DT1 = 20:00Z on D-1; DT2 = 10:00Z on D. Forecast = latest NBM run with runtime <= DT-3h (availability lag). Prices = the hourly
+  candle ending at DT: BUY YES at yes_ask, BUY NO at 1 - yes_bid, plus 1c slippage; skip books with ask>=0.99 or bid<=0.01. Kalshi taker fee formula; hold to settlement.
+- Model: outcome ~ Normal(mu = txn + city bias, sigma = c * xnd) with integer-degree continuity correction; city bias and scale c are fitted ONLY on dev.
+- Rule: trade if edge = p - (price + fee/contract) >= theta, theta in {0.03, 0.05, 0.08}; fixed 1% of bankroll per trade capped by 10% of prior-hour volume; max trades/day capped.
+- Also: favourite-longshot calibration by price bucket at DT (no model), rules "sell longshots" (buy NO when yes_ask<=0.10 / 0.05).
+- Every (DT x theta x city-set) is a trial; 2x cost (slippage 2c, fee x2) and +-20% theta nudges logged. Holdout touched once per finalist.

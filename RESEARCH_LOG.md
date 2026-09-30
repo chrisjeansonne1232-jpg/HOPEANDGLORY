@@ -210,3 +210,8 @@ single-stock momentum/reversal, funding-rate carry (offshore perps not US-legal)
 **Pipeline fix (2026-09-30, found while checking NYC coverage, BEFORE any weather P&L or price-vs-outcome result was viewed):** Kalshi omits hourly candles with no activity,
 so requiring a candle within 2h of the decision time dropped most DT2 quotes (24% coverage) although the book was standing; and liquidity was judged on a single (often zero-volume) hour.
 Changed to: standing quote = last candle before DT no more than 4h old (age recorded); liquidity reference = contracts traded in the prior 6h, position capped at 10% of it (was 25% of the prior hour).
+
+**Universe decision (2026-09-30, before any weather P&L viewed):** Kalshi's LAX, DEN and PHIL high-temperature series start 2025-01 / 2024-11 / 2024-11, i.e. entirely inside the holdout window
+(>= 2024-10-01), so they cannot be used for research. Research universe = NYC (KNYC, from 2021-08), Chicago (KMDW - verified better than KORD: mean error 0.75F vs 2.23F, MAE 2.6 vs 3.1),
+Miami (KMIA, from 2023-05), Austin (KAUS, from 2023-05). LAX/DEN/PHIL are reserved as genuinely out-of-sample cities to be looked at only together with the holdout, once per finalist.
+The downloaded holdout-era candles of all cities sit on disk but `research/weather_run.load_all` drops every event with D > 2024-09-30 on load.

@@ -76,3 +76,11 @@ def sr_variance(path=TRIALS_CSV, selection_split: str = "DEV+VAL") -> float:
     df = df[(df.status == "tested") & (df.split == selection_split)].drop_duplicates("trial_id")
     v = df.sr_period.astype(float).dropna()
     return float(v.var(ddof=1)) if len(v) > 2 else float("nan")
+
+
+def trial_srs(path=TRIALS_CSV, selection_split: str = "DEV+VAL") -> list:
+    df = load(path)
+    if not len(df):
+        return []
+    df = df[(df.status == "tested") & (df.split == selection_split) & (df.cost_mult == 1.0)].drop_duplicates("trial_id")
+    return df.sr_period.astype(float).dropna().tolist()

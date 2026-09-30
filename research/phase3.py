@@ -34,8 +34,9 @@ def evaluate(name: str, ret: dict[str, pd.Series], bench: pd.Series, rf: pd.Seri
     chk["profitable_dev_and_val"] = bool(rows["DEVELOPMENT"]["cagr"] > 0 and rows["VALIDATION"]["cagr"] > 0)
     chk["beats_bench_sharpe_dev+val"] = bool(rows["DEV+VAL"]["sharpe"] > rows["DEV+VAL"]["bench_sharpe"])
     v["beats_bench_absolute_return"] = bool(rows["DEV+VAL"]["cagr"] > rows["DEV+VAL"]["bench_cagr"])
-    n, var = T.n_trials(), T.sr_variance()
-    d = S.dsr(M.excess(dv, rf), n, var if var == var else 0.0)
+    n = T.n_trials()
+    var = S.hurdle_variance(T.trial_srs(), len(dv.dropna()))["used"]
+    d = S.dsr(M.excess(dv, rf), n, var)
     v["dsr"] = d
     chk["DSR>=0.95"] = bool(d["dsr"] >= 0.95)
     chk[">=100_oos_trades"] = bool(oos_trades is not None and oos_trades >= 100)
@@ -65,7 +66,7 @@ def evaluate(name: str, ret: dict[str, pd.Series], bench: pd.Series, rf: pd.Seri
     if cost2x:
         s2 = cost2x
         c2 = {sp: _cagr_sharpe(s2[sp], rf, ppy) for sp in ("DEVELOPMENT", "VALIDATION", "DEV+VAL")}
-        d2 = S.dsr(M.excess(s2["DEV+VAL"], rf), n, var if var == var else 0.0)
+        d2 = S.dsr(M.excess(s2["DEV+VAL"], rf), n, var)
         v["cost2x"] = {"by_split": {k: {"cagr": a, "sharpe": b} for k, (a, b) in c2.items()}, "dsr": d2["dsr"]}
         chk["2x_costs_profitable_and_DSR>=0.95"] = bool(c2["DEVELOPMENT"][0] > 0 and c2["VALIDATION"][0] > 0 and d2["dsr"] >= 0.95)
     if holdout is not None:

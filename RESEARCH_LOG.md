@@ -190,3 +190,14 @@ Data note: archived Kalshi candles use field names `close`/`volume` (live: `clos
 - **Independent check:** last six Yahoo SPY closes (2026-09-22..29) equal Massive's to the cent. SPY total-return CAGR 10.8% vs 8.9% price-only (dividend gap ~1.9%/yr as expected).
 - ETF opens are reliable (fraction equal to prior close <5% except thin BIL/SHY), so `next_open` execution is valid for the traded ETFs; the old S&P index opens are not.
 - Stooq unusable (bot-check page/connection resets). FRED intermittently times out; `^IRX` (13-week bill yield) used for the risk-free rate.
+
+## 11. Methodology correction: DSR hurdle variance (2026-09-30, before any finalist was evaluated)
+Problem found: after the BTC time-of-day trials (net Sharpe about -10 to -13 because 134bp/day of fees dwarfs a 3-10bp/day gross edge) the plain cross-trial variance of
+per-period Sharpe exploded (sd 0.092 = 1.46/yr) and pushed the hurdle from ~1.0 to 3.9 annualised - a statistical artifact (a few cost-doomed trials), not evidence of anything.
+Rule now (`lab.stats.hurdle_variance`): the hurdle uses the MORE CONSERVATIVE of (a) the robust empirical variance (1.4826*MAD of trial Sharpes, squared) and (b) the i.i.d.-null
+Sharpe sampling variance 1/T of the candidate's own sample length; the plain variance is still printed. N still counts every tested variant. Reported alongside every DSR.
+**CORRECTION (same day):** the sentence I first wrote here - that the change altered no candidate's status - was WRONG. Under the new hurdle BTC `crypto_trend_voltarget/BTC_sma50_vt40` reaches DSR 0.954
+(and BTC_sma150_vt40 0.948), whereas under the plain variance measured BEFORE the junk trials it was 0.84. The estimator was changed after seeing that the plain rule zeroed
+everything, so a crypto "pass" is estimator-dependent and must NOT be read as robust evidence. Any finalist must also be reported under the plain-before-junk estimator (hurdle ~1.0-1.2 annualised).
+Other reasons crypto trend is not a clean pass: full-size drawdowns of 36-82% (fails the 25% rule unless down-sized), two bull markets dominate the sample, BTC/ETH are survivors chosen ex post,
+few trades (22-68), holdout not yet looked at.

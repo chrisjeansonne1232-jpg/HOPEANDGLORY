@@ -1,4 +1,15 @@
 {
+ "coinbase/BTC-USD_3600": {
+  "fetched_utc": "2026-09-30T05:56:31Z",
+  "first": "2016-01-01 00:00:00",
+  "key": "BTC-USD_3600",
+  "last": "2026-09-30 05:00:00",
+  "note": "",
+  "rows": 94151,
+  "sha256": "c3d463f94371d70638e97065259f194a9bc2673ee69895499f81b81ad91b2806",
+  "source": "coinbase",
+  "url": "https://api.exchange.coinbase.com/products/BTC-USD/candles"
+ },
  "coinbase/BTC-USD_86400": {
   "fetched_utc": "2026-09-30T05:32:15Z",
   "first": "2015-07-20 00:00:00",

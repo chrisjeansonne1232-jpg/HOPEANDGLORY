@@ -117,3 +117,17 @@ def mc_block_bootstrap(r: pd.Series, horizon: int | None = None, block: int = 21
             "final_equity_p50": float(np.percentile(f, 50)), "final_equity_p95": float(np.percentile(f, 95)),
             "maxdd_p50": float(np.percentile(d, 50)), "maxdd_p05_worst": float(np.percentile(d, 5)),
             "prob_final_below_1": float((f < 1.0).mean()), "prob_maxdd_worse_than_25pct": float((d < -0.25).mean())}
+
+
+def hurdle_variance(trial_srs, n_obs: int) -> dict:
+    """Variance of per-period Sharpe used to set the Deflated-Sharpe hurdle. The plain cross-trial variance is destroyed by a few
+    cost-doomed trials (per-period SR of -0.5..-0.7), so the hurdle uses the MORE CONSERVATIVE of
+      (a) robust empirical variance: (1.4826 * MAD of the trial Sharpes)^2, and
+      (b) the i.i.d.-null sampling variance of a Sharpe estimate, 1/T, for the candidate's own sample length.
+    The plain variance is returned too for transparency. (Rule fixed 2026-09-30 before any finalist was evaluated.)"""
+    v = np.asarray([x for x in trial_srs if np.isfinite(x)], dtype=float)
+    plain = float(v.var(ddof=1)) if len(v) > 2 else float("nan")
+    robust = float((1.4826 * np.median(np.abs(v - np.median(v)))) ** 2) if len(v) > 2 else float("nan")
+    null = 1.0 / max(n_obs, 2)
+    used = max(robust if robust == robust else 0.0, null)
+    return {"plain": plain, "robust_mad": robust, "iid_null": null, "used": used}

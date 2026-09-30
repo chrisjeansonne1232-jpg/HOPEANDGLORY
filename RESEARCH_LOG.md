@@ -2,36 +2,36 @@
 
 Spec and hard rules: `MISSION.md` (verbatim user brief). Ledgers: `trials.csv` (every variant tested; row count feeds the Deflated
 Sharpe Ratio), `holdout_ledger.csv` (one holdout look per finalist; empty = nothing has touched the holdout).
-Tests: `python -m pytest -q` (38 pass). Network probe: `python scripts/check_network.py`.
+Tests: `python -m pytest -q` (38 pass). Network probe: `python scripts/check_network.py`. Data validation: `python scripts/validate_data.py` -> reports/data_validation.md.
 
 ---
 ## 0. STATUS / NEXT STEPS  (read this first)
 
-**Last updated:** 2026-09-30. **Phase 1 (test lab): COMPLETE and demonstrated. Phase 2 (idea testing): NOT STARTED — blocked on data access.**
-No strategy has been evaluated beyond the Phase-1 demo (200-day SMA on real 1999-2018 S&P 500 data; not a finding). No trades, no order
-code, no broker credentials, no broker tools were used. The final holdout has not been touched (`holdout_ledger.csv` is empty).
+**Last updated:** 2026-09-30 (session 1, continuing). **Phase 1 complete. Phase 2 IN PROGRESS.** The user opened network access mid-session (Yahoo, FRED(flaky), Coinbase,
+Binance, Kalshi, Polymarket, NOAA, IEM, CBOE, ntfy all reachable; Stooq resets connections -> dropped; SEC returns 403 without a contact User-Agent; Massive API needs a key,
+which is NOT needed). No trades, no order code, no broker tools. Holdout untouched (`holdout_ledger.csv` empty).
 
-### Blockers that need the user
-1. **Network allow-list (blocks all real research).** The cloud container's network policy returns HTTP 403 on CONNECT for every data host
-   (proof: `reports/network_status.json`). Fix: cloud environment menu (session title bar) -> Edit -> *Network access* -> broader access level, or
-   add these domains: `stooq.com`, `query1.finance.yahoo.com`, `fred.stlouisfed.org`, `api.exchange.coinbase.com`, `api.binance.us`,
-   `data.binance.vision`, `api.elections.kalshi.com`, `gamma-api.polymarket.com`, `clob.polymarket.com`, `api.weather.gov`,
-   `www.ncei.noaa.gov`, `mesonet.agron.iastate.edu`, `www.sec.gov`, `www.cboe.com`, `ntfy.sh`. (Also `kalshi.com`, `help.kalshi.com`,
-   `docs.polymarket.us`, `robinhood.com`, `cdn.robinhood.com` would let me verify fee schedules from primary sources.) A new session picks it up.
-2. **ntfy topic** for the Phase-4 heads-up (`<MY_TOPIC>` was never given) — and `ntfy.sh` must be allowed (above).
-3. **Massive/Polygon:** the connected Massive tool works for recent data only. Probe results below: your plan is NOT entitled to SPY daily bars for
-   2024-09 or earlier and is rate-limited. So it is only useful as a recent-window price cross-check, not for research history. I do NOT need the key
-   yet; if later needed for options quotes, put it in the environment as `MASSIVE_API_KEY` (env settings), never paste it in chat. Do not upgrade
-   before we know which idea needs it (options quotes are the only strong candidate).
-4. **Confirm defaults** (all in `lab/config.py`): account size $5,000 (range 2k-10k tested), short-term tax 22% (sensitivity 0/12/22/32%),
-   splits below, PDT mode "none" (see facts).
+### Where Phase 2 stands
+- **Batch 1 (equities/ETFs/crypto, 132 variants logged, `python -m research.families`, results in trials.csv, ranking via `python scripts/leaderboard.py`)**:
+  families f01 SPY trend + related assets, f02 multi-asset trend / sector & asset-class momentum, f03 calendar (turn-of-month, day-of-week, overnight/intraday),
+  f04 reversal (RSI2, IBS), f05 vol-managed, f06 short-vol (SVXY, capped), f07 crypto trend/weekend, f08 VIX-contango filter, f09 crypto trend x vol-target, f10 inverse-vol multi-asset trend.
+  **0 of 132 reach DSR >= 0.95.** Deflation hurdle at N=132 is an annualised Sharpe of ~1.0. Best DSRs: crypto trend (0.84, but max DD 53-82% at full size), then
+  inverse-vol multi-asset trend (Sharpe 0.81 vs SPY 0.51, max DD -9%, but CAGR ~7.5% < SPY) and the VIX-contango filter on SPY (Sharpe 0.6-0.67 vs 0.51).
+- **Killed by costs / no edge:** overnight & intraday SPY/QQQ (daily round trip ~4bp x 252 = ~10%/yr), day-of-week, BTC weekend/weekday, IBS/RSI2 fade in validation (edge decayed: dev 0.8 -> val 0.3).
+- **Batch 2 (in progress): Kalshi weather markets vs NBM forecasts** (design pre-registered in section 9). Data: `python scripts/fetch_kalshi_weather.py` (candles) +
+  `python scripts/fetch_iem_weather.py` (forecasts); analysis module `research/weather.py`. NOT yet analysed: no price-vs-outcome result has been viewed.
+- Generic Phase-3 evaluator: `research/phase3.py` (use only for candidates that clear DSR or as near-miss reporting; never loads the holdout).
 
-### Next steps once the network is open (in order)
-1. `python scripts/check_network.py` -> all green? 2. `python scripts/fetch_core_data.py` (UNTESTED LIVE: fix loaders against real responses; every
-   dataset must pass `lab.data.quality.check_ohlcv` and a Stooq-vs-Yahoo `spot_check`; adjusted-close basis of Stooq is unverified). 3. Use Massive only
-   to spot-check the last ~2 years of prices. 4. Write Kalshi/Polymarket/NOAA loaders against real responses. 5. Start Phase 2 in the priority order of
-   section 6, logging EVERY variant with `lab.trials.log_trial` and running `lab.lookahead.check_lookahead` before each strategy's first backtest.
-6. When nothing more can be tested: Phase 3 on finalists (holdout once each via `lab.splits.open_holdout`), then STRATEGY_REPORT.md, ntfy, STOP.
+### Blockers / asks for the user
+1. **ntfy topic** (`<MY_TOPIC>`) for the Phase-4 heads-up (ntfy.sh is reachable now).
+2. Confirm defaults in `lab/config.py` (account $5,000, tax 22%).
+3. Massive/Polygon: only needed if an options idea proves worth buying quotes for (plan currently entitles ~recent equity data only; do not upgrade yet).
+
+### Next steps
+1. When weather downloads finish (`data/raw/kalshi/*_candles.parquet` for KXHIGHNY, CHI, MIA, AUS, LAX, DEN, PHIL and `data/raw/iem/NBS_*.parquet`): verify Chicago station (KMDW vs KORD) by
+   forecast error only, run the pre-registered grid in `research/weather.py` (NOT yet written as a runner: build_city / add_rolling_bias / fit_sigma / p_yes / simulate exist), log every variant.
+2. Model-free favourite-longshot rules on the same data. 3. If any variant clears DSR >= 0.95 -> Phase 3 (`research/phase3.py`) + one holdout look. 4. Otherwise near-miss report.
+5. STRATEGY_REPORT.md, ntfy, STOP.
 
 ---
 ## 1. Pre-registration (frozen 2026-09-30, BEFORE any research backtest)
@@ -183,3 +183,10 @@ Replaced by a strictly point-in-time rolling bias: for event D and decision time
 before DT (DT1: events <= D-2; DT2: events <= D-1), requiring >= 20; events lacking that history are excluded from ALL evaluation (burn-in). The global sigma parameters
 (a, c) are still fitted on dev events only. Station mapping (e.g. Chicago KMDW vs KORD) is decided from forecast-vs-settlement error size on dev events, never from P&L.
 Data note: archived Kalshi candles use field names `close`/`volume` (live: `close_dollars`/`volume_fp`); loader fixed and verified on 2021, 2023, 2025 and 2026 markets.
+
+## 10. Data validation log (2026-09-30, real data)
+- Yahoo ETFs/indices, Coinbase BTC/ETH cached (33 datasets, `data/manifest.json`); `reports/data_validation.md`: 0 structural errors (only ^IRX yield-index zeros, expected).
+- SPY vs S&P price-return correlation 0.983 overall / 0.997 since 2015. Explained, not data errors: ex-dividend Fridays (SPY price drops by its dividend, index does not), 4:15pm ETF close vs 4:00pm index close before ~2010, stress-day close-auction differences.
+- **Independent check:** last six Yahoo SPY closes (2026-09-22..29) equal Massive's to the cent. SPY total-return CAGR 10.8% vs 8.9% price-only (dividend gap ~1.9%/yr as expected).
+- ETF opens are reliable (fraction equal to prior close <5% except thin BIL/SHY), so `next_open` execution is valid for the traded ETFs; the old S&P index opens are not.
+- Stooq unusable (bot-check page/connection resets). FRED intermittently times out; `^IRX` (13-week bill yield) used for the risk-free rate.
